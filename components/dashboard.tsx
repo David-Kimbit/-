@@ -39,7 +39,7 @@ interface MainProject {
 const mockProjects: MainProject[] = [
   {
     id: "1",
-    name: "A 대사업",
+    name: "2-2 지역창업촉진",
     allocated: 100000000,
     spent: 40000000,
     subProjects: [
