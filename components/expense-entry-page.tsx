@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsTrigger, TabsList } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -118,9 +118,10 @@ export default function ExpenseEntryPage() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="new" className="w-full">
-            <TabsTrigger value="new">신규 지출 등록</TabsTrigger>
-            <TabsTrigger value="edit">기존 내역 조회/수정</TabsTrigger>
-
+            <TabsList>
+              <TabsTrigger value="new">신규 지출 등록</TabsTrigger>
+              <TabsTrigger value="edit">기존 내역 조회/수정</TabsTrigger>
+            </TabsList>
             {/* New Expense Tab */}
             <TabsContent value="new" className="space-y-6 pt-6">
               <div className="space-y-6">
