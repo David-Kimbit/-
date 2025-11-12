@@ -1,9 +1,12 @@
 "use client"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Progress } from "@/components/ui/progress"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   PieChart,
   Pie,
@@ -66,8 +69,25 @@ const mockProjects: MainProject[] = [
   },
 ]
 
-function formatKRW(amount: number): string {
-  return `₩${(amount / 1000000).toFixed(1)}M`
+function formatAmount(amount: number, unit: string): string {
+  const divisor =
+    {
+      원: 1,
+      "천원 (1000원)": 1000,
+      "백만원 (1,000,000원)": 1000000,
+      "억원 (100,000,000원)": 100000000,
+    }[unit] || 1
+
+  const converted = amount / divisor
+  const unitDisplay =
+    {
+      원: "원",
+      "천원 (1000원)": "천원",
+      "백만원 (1,000,000원)": "백만원",
+      "억원 (100,000,000원)": "억원",
+    }[unit] || "원"
+
+  return `${converted.toLocaleString("ko-KR", { maximumFractionDigits: 1 })} ${unitDisplay}`
 }
 
 function calculatePercentage(spent: number, allocated: number): number {
@@ -75,6 +95,8 @@ function calculatePercentage(spent: number, allocated: number): number {
 }
 
 export default function Dashboard() {
+  const [currencyUnit, setCurrencyUnit] = useState("원")
+
   const totalAllocated = mockProjects.reduce((sum, p) => sum + p.allocated, 0)
   const totalSpent = mockProjects.reduce((sum, p) => sum + p.spent, 0)
   const totalRemaining = totalAllocated - totalSpent
@@ -104,9 +126,27 @@ export default function Dashboard() {
 
   return (
     <div className="ml-64 min-h-screen p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground">대시보드</h1>
-        <p className="text-muted-foreground mt-2">전체 예산 현황을 확인하세요</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">대시보드</h1>
+          <p className="text-muted-foreground mt-2">전체 예산 현황을 확인하세요</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="currency-select" className="text-sm font-medium">
+            금액 단위
+          </Label>
+          <Select value={currencyUnit} onValueChange={setCurrencyUnit}>
+            <SelectTrigger id="currency-select" className="w-48">
+              <SelectValue placeholder="단위 선택" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="원">원</SelectItem>
+              <SelectItem value="천원 (1000원)">천원 (1000원)</SelectItem>
+              <SelectItem value="백만원 (1,000,000원)">백만원 (1,000,000원)</SelectItem>
+              <SelectItem value="억원 (100,000,000원)">억원 (100,000,000원)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="space-y-8 max-w-7xl">
@@ -117,7 +157,7 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">총 지원금</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">{formatKRW(totalAllocated)}</div>
+              <div className="text-3xl font-bold text-foreground">{formatAmount(totalAllocated, currencyUnit)}</div>
               <p className="text-xs text-muted-foreground mt-1">전체 지원금</p>
             </CardContent>
           </Card>
@@ -127,7 +167,7 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium text-muted-foreground">총 사용액</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-foreground">{formatKRW(totalSpent)}</div>
+              <div className="text-3xl font-bold text-foreground">{formatAmount(totalSpent, currencyUnit)}</div>
               <p className="text-xs text-muted-foreground mt-1">{spentPercentage}% 사용</p>
             </CardContent>
           </Card>
@@ -137,7 +177,7 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium text-primary">잔여 예산</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary">{formatKRW(totalRemaining)}</div>
+              <div className="text-3xl font-bold text-primary">{formatAmount(totalRemaining, currencyUnit)}</div>
               <p className="text-xs text-primary/70 mt-1">{100 - spentPercentage}% 남음</p>
             </CardContent>
           </Card>
@@ -166,7 +206,7 @@ export default function Dashboard() {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value) => formatKRW(value as number)} />
+                  <Tooltip formatter={(value) => formatAmount(value as number, currencyUnit)} />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
@@ -179,8 +219,9 @@ export default function Dashboard() {
             <CardContent>
               <p className="text-muted-foreground leading-relaxed">
                 이곳에 지출 현황에 대한 월간 분석 코멘트가 표시됩니다. 현재 총 예산의 {spentPercentage}%가 사용되었으며,
-                남은 예산은 {formatKRW(totalRemaining)}입니다. 주요 지출 항목은 {mockProjects[0].name}에서
-                {formatKRW(mockProjects[0].spent)}이고, 전월 대비 지출이 증가하는 추세입니다.
+                남은 예산은 {formatAmount(totalRemaining, currencyUnit)}입니다. 주요 지출 항목은 {mockProjects[0].name}
+                에서
+                {formatAmount(mockProjects[0].spent, currencyUnit)}이고, 전월 대비 지출이 증가하는 추세입니다.
               </p>
             </CardContent>
           </Card>
@@ -209,7 +250,8 @@ export default function Dashboard() {
                               {projectSpentPercentage}% 사용
                             </Badge>
                             <span className="text-xs text-muted-foreground">
-                              {formatKRW(project.spent)} / {formatKRW(project.allocated)}
+                              {formatAmount(project.spent, currencyUnit)} /{" "}
+                              {formatAmount(project.allocated, currencyUnit)}
                             </span>
                           </div>
                           <Progress value={projectSpentPercentage} className="mt-3 h-2" />
@@ -224,9 +266,12 @@ export default function Dashboard() {
                             <LineChart data={monthlyData}>
                               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                               <XAxis dataKey="month" stroke="var(--color-muted-foreground)" />
-                              <YAxis stroke="var(--color-muted-foreground)" />
+                              <YAxis
+                                stroke="var(--color-muted-foreground)"
+                                label={{ value: "지출액", angle: -90, position: "insideLeft" }}
+                              />
                               <Tooltip
-                                formatter={(value) => formatKRW(value as number)}
+                                formatter={(value) => formatAmount(value as number, currencyUnit)}
                                 contentStyle={{
                                   backgroundColor: "var(--color-card)",
                                   border: "1px solid var(--color-border)",
@@ -262,21 +307,29 @@ export default function Dashboard() {
                                 return (
                                   <TableRow key={subProject.id}>
                                     <TableCell className="font-medium">{subProject.name}</TableCell>
-                                    <TableCell className="text-right">{formatKRW(subProject.allocated)}</TableCell>
+                                    <TableCell className="text-right">
+                                      {formatAmount(subProject.allocated, currencyUnit)}
+                                    </TableCell>
                                     <TableCell className="text-right text-destructive">
-                                      {formatKRW(subProject.spent)}
+                                      {formatAmount(subProject.spent, currencyUnit)}
                                     </TableCell>
                                     <TableCell className="text-right text-primary font-semibold">
-                                      {formatKRW(subRemaining)}
+                                      {formatAmount(subRemaining, currencyUnit)}
                                     </TableCell>
                                   </TableRow>
                                 )
                               })}
                               <TableRow className="bg-muted/50 font-semibold">
                                 <TableCell>합계</TableCell>
-                                <TableCell className="text-right">{formatKRW(project.allocated)}</TableCell>
-                                <TableCell className="text-right">{formatKRW(project.spent)}</TableCell>
-                                <TableCell className="text-right">{formatKRW(projectRemaining)}</TableCell>
+                                <TableCell className="text-right">
+                                  {formatAmount(project.allocated, currencyUnit)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {formatAmount(project.spent, currencyUnit)}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {formatAmount(projectRemaining, currencyUnit)}
+                                </TableCell>
                               </TableRow>
                             </TableBody>
                           </Table>
@@ -298,7 +351,9 @@ export default function Dashboard() {
                                 <TableRow key={idx}>
                                   <TableCell className="text-sm">{trans.date}</TableCell>
                                   <TableCell className="text-sm">{trans.description}</TableCell>
-                                  <TableCell className="text-right text-sm">{formatKRW(trans.amount)}</TableCell>
+                                  <TableCell className="text-right text-sm">
+                                    {formatAmount(trans.amount, currencyUnit)}
+                                  </TableCell>
                                   <TableCell className="text-center">
                                     <a href="#" className="text-primary text-xs hover:underline">
                                       {trans.attachment}
