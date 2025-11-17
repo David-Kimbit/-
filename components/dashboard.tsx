@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Progress } from "@/components/ui/progress"
@@ -12,10 +12,6 @@ import {
   Cell,
   LineChart,
   Line,
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -24,372 +20,243 @@ import {
   ResponsiveContainer,
 } from "recharts"
 
+// [ 🔽 1. 백엔드에서 받아올 데이터의 타입을 정의합니다 ]
+// [ 🔽 1. (19~34줄) 기존 interface 정의를 모두 지우고 이걸로 교체 ]
+
+// 백엔드 /api/main-projects 에서 받아올 데이터 타입
 interface MainProject {
-  id: number
-  name: string
-  total_budget: number
+  id: number;
+  name: string;
+  total_budget: number;
 }
 
+// (나중에 사용) 백엔드 /api/budget-items 에서 받아올 데이터 타입
+interface BudgetItem {
+  id: number;
+  name: string;
+  allocated_budget: number;
+  main_project_id: number;
+}
+
+// [ 🔼
+
 const mockProjects: MainProject[] = [
-  { id: 1, name: "A 대사업", total_budget: 100000000 },
-  { id: 2, name: "B 대사업", total_budget: 150000000 },
-  { id: 3, name: "C 대사업", total_budget: 80000000 },
+  {
+    id: "1",
+    name: "A 대사업",
+    allocated: 100000000,
+    spent: 40000000,
+    subProjects: [
+      { id: "1-1", name: "Sub-Project A-1", allocated: 50000000, spent: 20000000 },
+      { id: "1-2", name: "Sub-Project A-2", allocated: 50000000, spent: 20000000 },
+    ],
+  },
+  {
+    id: "2",
+    name: "B 대사업",
+    allocated: 150000000,
+    spent: 60000000,
+    subProjects: [
+      { id: "2-1", name: "Sub-Project B-1", allocated: 75000000, spent: 30000000 },
+      { id: "2-2", name: "Sub-Project B-2", allocated: 75000000, spent: 30000000 },
+    ],
+  },
+  {
+    id: "3",
+    name: "C 대사업",
+    allocated: 80000000,
+    spent: 32000000,
+    subProjects: [
+      { id: "3-1", name: "Sub-Project C-1", allocated: 40000000, spent: 16000000 },
+      { id: "3-2", name: "Sub-Project C-2", allocated: 40000000, spent: 16000000 },
+    ],
+  },
 ]
+// ... (파일 상단의 import, interface 정의는 그대로 둠) ...
 
 function formatKRW(amount: number): string {
+  // M (백만) 단위 대신, '원' 단위로 포맷팅합니다.
   return `₩${amount.toLocaleString("ko-KR")}원`
 }
 
-const monthlyTrendData = [
-  { month: "Jan", value: 45000000 },
-  { month: "Feb", value: 52000000 },
-  { month: "Mar", value: 48000000 },
-  { month: "Apr", value: 61000000 },
-  { month: "May", value: 55000000 },
-  { month: "Jun", value: 67000000 },
-  { month: "Jul", value: 72000000 },
-  { month: "Aug", value: 58000000 },
-  { month: "Sep", value: 75000000 },
-  { month: "Oct", value: 82000000 },
-  { month: "Nov", value: 78000000 },
-  { month: "Dec", value: 68000000 },
-]
+// ... (calculatePercentage 함수는 그대로 둠) ...
 
 export default function Dashboard() {
-  const [projects, setProjects] = useState<MainProject[]>(mockProjects)
-  const [selectedCurrency, setSelectedCurrency] = useState("원")
+  // [ 🔽 1. mockProjects 대신, API 데이터를 담을 state를 만듭니다 ]
+  const [projects, setProjects] = useState<MainProject[]>([]);
+  // (나중에 로딩 스피너를 위해 추가)
+  // const [isLoading, setIsLoading] = useState(true);
 
-  const totalAllocated = projects.reduce((sum, p) => sum + p.total_budget, 0)
-  const totalSpent = 132000000
-  const totalRemaining = totalAllocated - totalSpent
-  const spentPercentage = Math.round((totalSpent / totalAllocated) * 100)
-
-  const formatAmount = (amount: number): string => {
-    switch (selectedCurrency) {
-      case "천원":
-        return `₩${(amount / 1000).toLocaleString("ko-KR", { maximumFractionDigits: 0 })}천`
-      case "백만원":
-        return `₩${(amount / 1000000).toLocaleString("ko-KR", { maximumFractionDigits: 1 })}M`
-      case "억원":
-        return `₩${(amount / 100000000).toLocaleString("ko-KR", { maximumFractionDigits: 1 })}억`
-      default:
-        return formatKRW(amount)
+  // [ 🔽 2. 컴포넌트가 처음 보일 때 백엔드 API를 호출합니다 ]
+  useEffect(() => {
+    async function fetchProjects() {
+      try {
+        const response = await fetch("http://127.0.0.1:8000/api/main-projects");
+        if (!response.ok) {
+          throw new Error("Failed to fetch data");
+        }
+        const data: MainProject[] = await response.json();
+        setProjects(data); // 성공하면, 받아온 데이터를 'state'에 저장
+      } catch (error) {
+        console.error("Error fetching main projects:", error);
+      }
+      // setIsLoading(false);
     }
-  }
+
+    fetchProjects(); // 함수 실행
+  }, []); // [] = "단 한 번만" 실행
+
+  // [ 🔽 3. 'mockProjects' 대신, 실제 'projects' state를 사용하도록 계산 로직 변경 ]
+  const totalAllocated = projects.reduce((sum, p) => sum + p.total_budget, 0)
+  const totalSpent = 0 // [임시] 아직 지출 API가 없으므로 0으로 고정
+  const totalRemaining = totalAllocated - totalSpent
+  const spentPercentage = 0 // [임시] 0으로 고정
 
   const pieData = projects.map((project) => ({
     name: project.name,
-    value: project.total_budget,
+    value: project.total_budget, // [수정] 'spent' 대신 'total_budget'으로 파이 차트 표시
   }))
 
-  const COLORS = ["#06b6d4", "#0ea5e9", "#06b6d4", "#14b8a6", "#10b981", "#06b6d4", "#0ea5e9", "#06b6d4", "#14b8a6", "#10b981"]
+  const COLORS = ["#8884d8", "#82ca9d", "#ffc658", "#ff7c7c", "#8dd1e1", "#d084d0", "#a4de6c", "#d0a46c", "#83a698", "#a8bccc", "#c7a8cc"]
+
+  // [ 🔽 4. (삭제) v0가 만든 가짜 데이터들을 모두 지웁니다 ]
+  // const monthlyData = [...] 
+  // const detailedTransactions = [...]
+  // const mockProjects = [...] // (파일 상단에 있던 mockProjects도 지워야 합니다)
 
   return (
-    <div className="ml-64 min-h-screen p-8 pt-24 bg-background">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="ml-64 min-h-screen p-8">
+      {/* ... (상단 h1, p 태그는 동일) ... */}
 
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">오늘의 매출</h1>
-            <p className="text-sm text-muted-foreground mt-1">매출 요약</p>
-          </div>
-          <select
-            value={selectedCurrency}
-            onChange={(e) => setSelectedCurrency(e.target.value)}
-            className="px-3 py-2 bg-card border border-border rounded-md text-foreground text-sm"
-          >
-            <option>원</option>
-            <option>천원</option>
-            <option>백만원</option>
-            <option>억원</option>
-          </select>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-card border border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">총 지원금</p>
-                  <p className="text-2xl font-bold text-foreground">{formatAmount(totalAllocated)}</p>
-                  <p className="text-xs text-cyan-500 mt-2">+10% from yesterday</p>
-                </div>
-                <div className="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center text-cyan-500">
-                  📊
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">주요 건수</p>
-                  <p className="text-2xl font-bold text-foreground">500</p>
-                  <p className="text-xs text-emerald-500 mt-2">+8% from yesterday</p>
-                </div>
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center text-emerald-500">
-                  ⚡
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">불실 신청</p>
-                  <p className="text-2xl font-bold text-foreground">9</p>
-                  <p className="text-xs text-amber-500 mt-2">+2% from yesterday</p>
-                </div>
-                <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center text-amber-500">
-                  🛍️
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border border-border">
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">새로운 고객</p>
-                  <p className="text-2xl font-bold text-foreground">12</p>
-                  <p className="text-xs text-cyan-500 mt-2">+3% from yesterday</p>
-                </div>
-                <div className="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center text-cyan-500">
-                  👥</div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Bar Chart - Level */}
-          <Card className="bg-card border border-border">
+      <div className="space-y-8 max-w-7xl">
+        {/* Summary Cards */}
+        {/* [ 🔽 5. 상단 카드들이 이제 'projects' state를 바라봅니다 ] */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="bg-card">
             <CardHeader>
-              <CardTitle className="text-base">Level</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">총 지원금</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart data={monthlyTrendData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="var(--color-muted-foreground)" />
-                  <YAxis tick={{ fontSize: 12 }} stroke="var(--color-muted-foreground)" />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: "8px" }}
-                    formatter={(value) => formatAmount(value as number)}
-                  />
-                  <Bar dataKey="value" fill="#06b6d4" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {/* [수정] formatKRW가 '원' 단위로 표시하도록 변경됨 */}
+              <div className="text-3xl font-bold text-foreground">{formatKRW(totalAllocated)}</div>
+              <p className="text-xs text-muted-foreground mt-1">전체 지원금</p>
             </CardContent>
           </Card>
 
-          {/* Area Chart - 용류비용 */}
-          <Card className="bg-card border border-border">
+          <Card className="bg-card">
             <CardHeader>
-              <CardTitle className="text-base">용류비용</CardTitle>
-              <Badge variant="outline" className="w-fit text-xs mt-2">새로운 고객</Badge>
+              <CardTitle className="text-sm font-medium text-muted-foreground">총 사용액</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
-                <AreaChart data={monthlyTrendData}>
-                  <defs>
-                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="var(--color-muted-foreground)" />
-                  <YAxis tick={{ fontSize: 12 }} stroke="var(--color-muted-foreground)" />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "var(--color-card)", border: "1px solid var(--color-border)", borderRadius: "8px" }}
-                    formatter={(value) => formatAmount(value as number)}
-                  />
-                  <Area type="monotone" dataKey="value" stroke="#06b6d4" fillOpacity={1} fill="url(#colorValue)" />
-                </AreaChart>
-              </ResponsiveContainer>
+              <div className="text-3xl font-bold text-foreground">{formatKRW(totalSpent)}</div>
+              <p className="text-xs text-muted-foreground mt-1">{spentPercentage}% 사용</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-primary/10 border-primary/20">
+            <CardHeader>
+              <CardTitle className="text-sm font-medium text-primary">잔여 예산</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-primary">{formatKRW(totalRemaining)}</div>
+              <p className="text-xs text-primary/70 mt-1">{100 - spentPercentage}% 남음</p>
             </CardContent>
           </Card>
         </div>
 
+        {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Ranked Projects Table */}
-          <Card className="lg:col-span-2 bg-card border border-border">
+          <Card className="lg:col-span-1">
             <CardHeader>
-              <CardTitle className="text-base">판매량 순</CardTitle>
+              {/* [수정] 파이 차트 제목 변경 */}
+              <CardTitle className="text-lg">대사업별 예산 비중 (%)</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border hover:bg-transparent">
-                    <TableHead className="text-xs text-muted-foreground font-medium">#</TableHead>
-                    <TableHead className="text-xs text-muted-foreground font-medium">사항명</TableHead>
-                    <TableHead className="text-xs text-muted-foreground font-medium">인기도</TableHead>
-                    <TableHead className="text-xs text-muted-foreground font-medium text-right">할인율</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {projects.map((project, idx) => {
-                    const progressValue = ((idx + 1) / projects.length) * 100
-                    return (
-                      <TableRow key={project.id} className="border-border hover:bg-muted/50">
-                        <TableCell className="text-sm font-medium">0{idx + 1}</TableCell>
-                        <TableCell className="text-sm text-foreground">{project.name}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Progress value={progressValue} className="w-24 h-1.5" />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant="outline" className="text-amber-500 border-amber-500/30 text-xs">
-                            {46 - idx * 14}%
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          {/* Pie Chart */}
-          <Card className="bg-card border border-border">
-            <CardHeader>
-              <CardTitle className="text-base">대사업별 지출 비중</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={250}>
+              <ResponsiveContainer width="100%" height={300}>
+                {/* [ 🔽 6. 파이 차트가 이제 'projects' state를 바라봅니다 ] */}
                 <PieChart>
                   <Pie
                     data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={2}
+                    // ... (파이 차트 설정은 동일) ...
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
                     dataKey="value"
                   >
                     {pieData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value) => formatAmount(value as number)} />
+                  <Tooltip formatter={(value) => formatKRW(value as number)} />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Total Expense Card */}
-          <Card className="bg-card border border-border">
+          <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle className="text-base">순수익</CardTitle>
-              <CardDescription className="text-xs">Total Expense</CardDescription>
+              <CardTitle className="text-lg">월간 재정 요약 (분석)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <p className="text-3xl font-bold text-foreground">{formatAmount(totalSpent)}</p>
-                <p className="text-xs text-muted-foreground">Profit is 48% More than last Month</p>
-                <div className="w-32 h-32 mx-auto">
-                  <svg viewBox="0 0 100 100" className="w-full h-full">
-                    <circle cx="50" cy="50" r="45" fill="none" stroke="var(--color-muted)" strokeWidth="8" />
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="45"
-                      fill="none"
-                      stroke="#06b6d4"
-                      strokeWidth="8"
-                      strokeDasharray={`${(80 / 100) * 282.7} 282.7`}
-                      strokeLinecap="round"
-                      transform="rotate(-90 50 50)"
-                    />
-                    <text x="50" y="50" textAnchor="middle" dominantBaseline="middle" className="text-2xl font-bold fill-foreground">
-                      80%
-                    </text>
-                  </svg>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Monthly Summary */}
-          <Card className="lg:col-span-2 bg-card border border-border">
-            <CardHeader>
-              <CardTitle className="text-base">월별 요약</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-2">Current Trend Analysis</p>
-                  <p className="text-sm text-foreground leading-relaxed">
-                    현재 월평균 지출액은 {formatAmount(totalSpent / 12)}이며, 전체 예산의 {spentPercentage}%가 사용되었습니다. 
-                    예산 집행 추세는 매월 증가하고 있으며, 잔여 예산은 {formatAmount(totalRemaining)}입니다. 
-                    월별 분석 결과, 가장 높은 지출은 10월에 기록되었습니다.
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Last Month</p>
-                    <p className="text-lg font-semibold text-foreground">{formatAmount(68000000)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">This Month</p>
-                    <p className="text-lg font-semibold text-cyan-500">{formatAmount(82000000)}</p>
-                  </div>
-                </div>
-              </div>
+              {/* [ 🔽 7. 분석 텍스트가 'projects' state를 바라봅니다 ] */}
+              <p className="text-muted-foreground leading-relaxed">
+                현재 총 예산의 {spentPercentage}%가 사용되었으며, 남은 예산은 {formatKRW(totalRemaining)}입니다. 
+                {projects.length > 0 && (
+                  <>
+                    주요 예산 항목은 {projects[0].name}에 {formatKRW(projects[0].total_budget)}가 배정되었습니다.
+                  </>
+                )}
+              </p>
             </CardContent>
           </Card>
         </div>
 
-        <Card className="bg-card border border-border">
+        {/* Projects Accordion */}
+        <Card>
           <CardHeader>
-            <CardTitle className="text-base">대사업별 현황</CardTitle>
-            <CardDescription className="text-xs">대사업을 클릭하여 예산과목 상세 정보를 확인하세요</CardDescription>
+            <CardTitle>대사업별 현황</CardTitle>
+            <CardDescription>대사업을 클릭하여 예산과목 상세 정보를 확인하세요</CardDescription>
           </CardHeader>
           <CardContent>
+            {/* [ 🔽 8. (핵심) Accordion이 'mockProjects' 대신 'projects' state를 바라봅니다 ] */}
             <Accordion type="single" collapsible className="w-full">
               {projects.map((project) => {
-                const projectSpent = Math.round((Math.random() * project.total_budget) / 1000000) * 1000000
-                const spendPercent = Math.round((projectSpent / project.total_budget) * 100)
+                // [임시] 지출액이 없으므로 0으로 고정
+                const projectSpentPercentage = 0
+                const projectRemaining = project.total_budget - 0
 
                 return (
-                  <AccordionItem key={project.id} value={`project-${project.id}`}>
-                    <AccordionTrigger className="hover:no-underline py-4">
+                  <AccordionItem key={project.id} value={project.name}> {/* [수정] key/value 변경 */}
+                    <AccordionTrigger className="hover:no-underline">
                       <div className="flex items-center justify-between w-full pr-4">
-                        <div className="flex-1 text-left">
-                          <h3 className="font-semibold text-foreground text-sm">{project.name}</h3>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-foreground text-left">{project.name}</h3>
                           <div className="flex items-center gap-3 mt-2">
                             <Badge variant="outline" className="text-xs">
-                              {spendPercent}% 사용
+                              {projectSpentPercentage}% 사용
                             </Badge>
                             <span className="text-xs text-muted-foreground">
-                              {formatAmount(projectSpent)} / {formatAmount(project.total_budget)}
+                              {/* [수정] 'spent' 대신 0, 'allocated' 대신 'total_budget' */}
+                              {formatKRW(0)} / {formatKRW(project.total_budget)}
                             </span>
                           </div>
-                          <Progress value={spendPercent} className="mt-3 h-1.5" />
+                          <Progress value={projectSpentPercentage} className="mt-3 h-2" />
                         </div>
                       </div>
                     </AccordionTrigger>
-                    <AccordionContent className="pt-4">
-                      <div className="space-y-4">
-                        <ResponsiveContainer width="100%" height={200}>
-                          <LineChart data={monthlyTrendData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                            <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
-                            <YAxis tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
-                            <Tooltip formatter={(value) => formatAmount(value as number)} />
-                            <Line type="monotone" dataKey="value" stroke="#06b6d4" strokeWidth={2} dot={false} />
-                          </LineChart>
-                        </ResponsiveContainer>
+                    <AccordionContent>
+                      {/* [ 🔽 9. (다음 단계) Accordion 내부 컨텐츠는 비워둡니다 ] */}
+                      <div className="pt-4 space-y-6">
+                        <div className="border-t border-border pt-6">
+                          <h4 className="font-semibold text-foreground mb-4">예산과목별 현황 (다음 단계)</h4>
+                          <p className="text-muted-foreground">
+                            이곳에 {project.name}에 속한 예산과목 리스트가 표시됩니다.
+                            (GET /api/budget-items?main_project_id={project.id} API 호출 필요)
+                          </p>
+                          {/* (이전 테이블은 project.subProjects.map(...)을 사용했지만, 
+                             project에는 subProjects가 없으므로 이 로직은 나중에 추가해야 함)
+                          */}
+                        </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
