@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Progress } from "@/components/ui/progress"
@@ -58,24 +58,6 @@ const monthlyTrendData = [
 export default function Dashboard() {
   const [projects, setProjects] = useState<MainProject[]>(mockProjects)
   const [selectedCurrency, setSelectedCurrency] = useState("원")
-
-  useEffect(() => {
-    async function fetchProjects() {
-      try {
-        const response = await fetch("http://127.0.0.1:8000/api/main-projects")
-        if (!response.ok) {
-          throw new Error("Failed to fetch data")
-        }
-        const data: MainProject[] = await response.json()
-        setProjects(data)
-      } catch (error) {
-        console.error("Error fetching main projects:", error)
-        setProjects(mockProjects)
-      }
-    }
-
-    fetchProjects()
-  }, [])
 
   const totalAllocated = projects.reduce((sum, p) => sum + p.total_budget, 0)
   const totalSpent = 132000000
