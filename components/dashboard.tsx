@@ -35,6 +35,41 @@ interface BudgetItem {
   main_project_id: number
 }
 
+// Mock data for preview environment (백엔드 연결 전 테스트용)
+const mockProjects: MainProject[] = [
+  { id: 1, name: "교육혁신사업", total_budget: 500000000 },
+  { id: 2, name: "연구개발사업", total_budget: 800000000 },
+  { id: 3, name: "산학협력사업", total_budget: 300000000 },
+  { id: 4, name: "국제교류사업", total_budget: 200000000 },
+  { id: 5, name: "인프라구축사업", total_budget: 450000000 },
+]
+
+const mockBudgetItems: { [key: number]: BudgetItem[] } = {
+  1: [
+    { id: 101, name: "교원인건비", allocated_budget: 150000000, main_project_id: 1 },
+    { id: 102, name: "학생지원비", allocated_budget: 200000000, main_project_id: 1 },
+    { id: 103, name: "교육장비비", allocated_budget: 150000000, main_project_id: 1 },
+  ],
+  2: [
+    { id: 201, name: "연구인건비", allocated_budget: 300000000, main_project_id: 2 },
+    { id: 202, name: "연구장비비", allocated_budget: 250000000, main_project_id: 2 },
+    { id: 203, name: "연구재료비", allocated_budget: 150000000, main_project_id: 2 },
+    { id: 204, name: "논문게재료", allocated_budget: 100000000, main_project_id: 2 },
+  ],
+  3: [
+    { id: 301, name: "산업체협력비", allocated_budget: 150000000, main_project_id: 3 },
+    { id: 302, name: "현장실습비", allocated_budget: 150000000, main_project_id: 3 },
+  ],
+  4: [
+    { id: 401, name: "해외연수비", allocated_budget: 100000000, main_project_id: 4 },
+    { id: 402, name: "국제학술대회", allocated_budget: 100000000, main_project_id: 4 },
+  ],
+  5: [
+    { id: 501, name: "시설개선비", allocated_budget: 250000000, main_project_id: 5 },
+    { id: 502, name: "장비구입비", allocated_budget: 200000000, main_project_id: 5 },
+  ],
+}
+
 function formatKRW(amount: number): string {
   return `₩${amount.toLocaleString("ko-KR")}원`
 }
@@ -54,7 +89,8 @@ export default function Dashboard() {
         const data: MainProject[] = await response.json()
         setProjects(data)
       } catch (error) {
-        console.error("Error fetching main projects:", error)
+        // Fallback to mock data when API is unavailable
+        setProjects(mockProjects)
       }
     }
 
@@ -79,9 +115,8 @@ export default function Dashboard() {
       const data: BudgetItem[] = await response.json()
       setBudgetItems((prev) => ({ ...prev, [projectId]: data }))
     } catch (error) {
-      console.error(`Error fetching budget items for project ${projectId}:`, error)
-      // Set empty array on error to prevent repeated attempts
-      setBudgetItems((prev) => ({ ...prev, [projectId]: [] }))
+      // Fallback to mock data when API is unavailable
+      setBudgetItems((prev) => ({ ...prev, [projectId]: mockBudgetItems[projectId] || [] }))
     } finally {
       setLoadingBudgetItems((prev) => ({ ...prev, [projectId]: false }))
     }
